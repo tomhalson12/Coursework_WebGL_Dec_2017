@@ -1,0 +1,574 @@
+﻿<html>
+	<head>
+		<title>CM20219 – Coursework 2 – WebGL</title>
+        <meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body { margin: 0; overflow: hidden; }
+			canvas { width: 100%; height: 100%; }
+		</style>
+	</head>
+	<body>
+		<script src="three.js"></script>
+        <script src="OBJLoader.js"></script>
+		<script>
+            "use strict"; // https://stackoverflow.com/q/1335851/72470
+
+            // Global variables that are available in all functions.
+            // Note: You can add your own here, e.g. to store the rendering mode.
+            var camera,childCamera, scene, renderer, mesh, cubeDisplay, cube, cubeRotationX, cubeRotationY, cubeRotationZ, cubeEdges;
+            var cubeVertices, xrot, yrot, zrot, r, theta ,phi, newX, newY, newZ, bunnyDisplay, bunny, bunnyRotationX, bunnyRotationY, bunnyRotationZ, bunnyEdges, bunnyVertices;
+            var bunnyRenderMode, facesMode, gameOn, squareArray, blankMaterial, p1Material, p2Material, p1Turn, squareGeometry,p1Geometry, p2Geometry;
+            var gameTurns;
+            var currentSelection = 0;
+            var cubeMode = 0;
+            var cameraMovementDistance = 0.1;
+            var camStartPoint = [3,4,5];
+
+            // Initialise the scene, and draw it for the first time.
+            init();
+			animate();
+
+            // Listen for keyboard events, to react to them.
+            // Note: there are also other event listeners, e.g. for mouse events.
+            document.addEventListener('keydown', handleKeyDown);
+
+            // Scene initialisation. This function is only run once, at the very beginning.
+            function init()
+            {
+                scene = new THREE.Scene();
+
+                // Set up the camera, move it to (3, 4, 5) and look at the origin (0, 0, 0).
+                camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000); 
+                camera.position.set(3, 4, 5);
+                camera.lookAt(new THREE.Vector3(0, 0, 0));
+
+                //child for main camera to focus
+                childCamera = new THREE.Object3D();
+                childCamera.position.set(0,0,0);
+                childCamera.lookAt(3,4,5);
+
+                // Draw a helper grid in the x-z plane (note: y is up).
+                scene.add(new THREE.GridHelper(10, 20, 0xffffff));
+
+                // TO DO: Draw a cube (requirement 1).
+                // code adapted from http://www.realtimerendering.com/basics3js/#1
+                var geometryCube = new THREE.BoxBufferGeometry(2,2,2);
+                var materials = [ //code adapted http://www.realtimerendering.com/basics3js/#12
+                    new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load('textures/bricks.jpg')}),
+                    new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load('textures/crate.jpg')}),
+                    new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load('textures/fire.jpg')}),
+                    new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load('textures/metal.jpg')}),
+                    new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load('textures/stone.jpg')}),
+                    new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load('textures/water.jpg')})
+                ];
+                cube = new THREE.Mesh(geometryCube, materials);
+
+
+               // materials = 
+                    //new THREE.MeshBasicMaterial({color:0xFF0EF7});
+            // cube = new THREE.Mesh(geometryCube, materials);
+
+                //geometry for cubes edges
+                //code adapted from https://threejs.org/docs/#api/geometries/EdgesGeometry
+                var edges = new THREE.EdgesGeometry(geometryCube);
+                cubeEdges = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({color:0xFF0EF7}));
+
+                //geometry for cube vertices
+                //code adapted from https://threejs.org/docs/#api/materials/PointsMaterial
+                var verticesMaterial = new THREE.PointsMaterial({color:0xFF0EF7});
+                verticesMaterial.size = .25;
+                cubeVertices = new THREE.Points(geometryCube, verticesMaterial);
+
+                //setting cube attributes
+                cubeDisplay = cube;
+                facesMode = true;
+                cubeRotationX = false;
+                cubeRotationY = false;
+                cubeRotationZ = false;
+                scene.add(cubeDisplay);
+
+                //loading bunny
+                //code adapted from https://threejs.org/docs/#examples/loaders/OBJLoader
+                var loader = new THREE.OBJLoader();
+                bunnyDisplay = new THREE.Object3D();
+
+                loader.load(
+                    'bunny-5000.obj',
+                    function ( object ) {
+                        
+                        bunny = object;
+                        //edge look for bunny
+                        var bunnyEdgeGeo = new THREE.EdgesGeometry(bunny.children[0].geometry, 1);
+                        bunnyEdges = new THREE.LineSegments(bunnyEdgeGeo,new THREE.LineBasicMaterial({color: 0x42f45c}));
+
+                        //vertices for the bunny
+                        var bunnyVerticesMaterial = new THREE.PointsMaterial({color:0x42f45c});
+                        bunnyVerticesMaterial.size = .008;
+                        bunnyVertices = new THREE.Points(bunny.children[0].geometry,bunnyVerticesMaterial);
+
+                        //regular look for bunny
+                        bunny = new THREE.Mesh(bunny.children[0].geometry, new THREE.MeshPhongMaterial({color: 0x42f45c}));
+
+                        bunnyRenderMode = bunny
+                        bunnyDisplay.add(bunnyRenderMode);
+                        scene.add( bunnyDisplay );
+                    }                  
+                );
+
+                //setting attributes for bunny
+                bunnyDisplay.scale.set(0.3,0.3,0.3);
+                bunnyRotationX = false;
+                bunnyRotationY = false;
+                bunnyRotationZ = false;
+
+                // TO DO: Visualise the axes of the global coordinate system (requirement 2).
+                var axis = new THREE.AxesHelper(5);
+				scene.add(axis);
+
+               
+                // Basic ambient lighting.
+                //scene.add(new THREE.AmbientLight(0xffffff));
+                // TO DO: add more complex lighting for 'face' rendering mode (requirement 4).
+                //point light to create shading on the phong materials
+                var light = new THREE.PointLight(0xffffff, 1, 100);
+                light.position.set(3,4,5);
+                scene.add(light);
+
+
+                //Game setup, materials and geometry
+                gameOn = false;
+                blankMaterial = new THREE.MeshPhongMaterial( {color: 0xffffff} );
+                p1Material = new THREE.MeshPhongMaterial( {color: 0x4256f4} );
+                p2Material = new THREE.MeshPhongMaterial( {color: 0x41f444})
+                squareGeometry = new THREE.BoxBufferGeometry(.8,.8,.8);
+                p1Geometry = new THREE.TorusGeometry( .375, .1, 16, 100 );
+                p2Geometry = new THREE.TorusKnotGeometry( .275, .1, 100, 16 );
+              
+
+                // Set up the Web GL renderer.
+                renderer = new THREE.WebGLRenderer({ antialias: true });
+				renderer.setPixelRatio(window.devicePixelRatio); // HiDPI/retina rendering
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                document.body.appendChild(renderer.domElement);
+
+                // Handle resizing of the browser window.
+				window.addEventListener('resize', handleResize, false);
+            }
+
+            // Handle resizing of the browser window.
+            function handleResize()
+            {
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize(window.innerWidth, window.innerHeight);
+			}
+
+            // Animation loop function. This function is called whenever an update is required.
+			function animate()
+            {
+				requestAnimationFrame(animate);
+
+                // TO DO: This is a good place for code that rotates your cube (requirement 3).
+                if(cubeRotationX == true){
+                    cubeDisplay.rotation.x += 0.005;
+                }else{
+                    cubeDisplay.rotation.x = cubeDisplay.rotation.x;
+                }
+
+                if(cubeRotationY == true){
+                    cubeDisplay.rotation.y += 0.005;
+                }else{
+                    cubeDisplay.rotation.y = cubeDisplay.rotation.y;
+                }
+
+                if(cubeRotationZ == true){
+                    cubeDisplay.rotation.z += 0.005;
+                }else{
+                    cubeDisplay.rotation.z = cubeDisplay.rotation.z;
+                }
+
+                //bunny rotation
+                if(bunnyRotationX == true){
+                    bunnyDisplay.rotation.x += 0.005;
+                }else{
+                    bunnyDisplay.rotation.x = bunnyDisplay.rotation.x;
+                }
+
+                if(bunnyRotationY == true){
+                    bunnyDisplay.rotation.y += 0.005;
+                }else{
+                    bunnyDisplay.rotation.y = bunnyDisplay.rotation.y;
+                }
+
+                if(bunnyRotationZ == true){
+                    bunnyDisplay.rotation.z += 0.005;
+                }else{
+                    bunnyDisplay.rotation.z = bunnyDisplay.rotation.z;
+                }
+
+               
+                // Render the current scene to the screen.
+				renderer.render(scene, camera);
+			}
+
+            //store objects current rotation
+			function setinitialRotation(object){
+				xrot = object.rotation.x
+                yrot = object.rotation.y
+                zrot = object.rotation.z
+			}
+
+            //resets objects rotation
+			function setNewRotation(object){
+				object.rotation.x = xrot;
+                object.rotation.y = yrot;
+                object.rotation.z = zrot;
+			}
+
+            //calculates spherical coordinates from current Cartesian coordinates
+            function calcSphericalCoord(){
+                r = Math.sqrt(Math.pow(camera.position.x,2) + Math.pow(camera.position.y,2) + Math.pow(camera.position.z,2));
+                theta = Math.acos(camera.position.y/r) * (180/Math.PI);
+                phi = Math.atan2(camera.position.z,camera.position.x) * (180/Math.PI);
+            }
+
+            //calculates cartesian coordinates from spherical coordinates
+            function calcCartesianCoord(){
+                newX = r * Math.sin(theta * (Math.PI/180)) * Math.cos(phi * (Math.PI/180));
+                newZ = r * Math.sin(theta * (Math.PI/180)) * Math.sin(phi * (Math.PI/180));
+                newY = r * Math.cos(theta * (Math.PI/180));
+            }
+
+            //sets up game by displaying blank tic-tac-toe board
+            function startGame(){
+                scene.remove(cubeDisplay);
+                bunnyDisplay.remove(bunnyRenderMode);
+                squareArray = new Array(6);
+                currentSelection = 0;
+                p1Turn = true;
+                gameTurns =0;
+                gameOn = true;
+                
+                var square = new THREE.Mesh( squareGeometry, blankMaterial );
+                var num = 0;
+                for(var i = 2.5; i > 0; i--){
+                    for(var j = -1; j < 2; j+=1){
+                        squareArray[num] = square.clone();
+                        squareArray[num].position.set(j,i,-3);
+                        scene.add(squareArray[num++]);
+                    }
+                }
+                
+                squareArray[currentSelection].material = p1Material;
+            }
+
+            //removes game board from scene
+            function resetGame(){
+                gameOn = false;
+                for(var i = 0; i < 9; i++){
+                    scene.remove(squareArray[i]);
+                }
+            }
+
+            //highlights current selection on the game board
+            function positionSelection(){
+                if(gameTurns < 9){
+                    if(squareArray[currentSelection].geometry == squareGeometry){
+                        squareArray[currentSelection].material = blankMaterial;
+                    }
+
+                    currentSelection++;
+                    if(currentSelection == 9){
+                        currentSelection = 0;
+                    }
+
+                    var count = 0;
+                    //makes sure selection position hasn't already been chosen
+                    while(squareArray[currentSelection].geometry != squareGeometry){
+                        currentSelection++;
+                        if(currentSelection == 9){
+                            currentSelection = 0;
+                        }
+
+                        if(++count > 8){
+                            break;
+                        }
+                    }
+
+                    if(p1Turn){
+                        squareArray[currentSelection].material = p1Material;
+                    }else{
+                        squareArray[currentSelection].material = p2Material;
+                    }
+                }
+            }
+
+            // Handle keyboard presses.
+            function handleKeyDown(event)
+            {
+                switch (event.keyCode)
+                {
+                    // Render modes.
+                    case 70: // f = faces for cube
+                    	setinitialRotation(cubeDisplay);
+                        scene.remove(cubeDisplay);
+                        cubeDisplay = cube;
+                        facesMode = true;
+                        scene.add(cubeDisplay) 
+                       	setNewRotation(cubeDisplay);
+                        break;
+
+                    case 69: // e = edges for cube
+                       	setinitialRotation(cubeDisplay);
+                        scene.remove(cubeDisplay);
+                        cubeDisplay = cubeEdges;
+                        facesMode = false;
+                        scene.add(cubeDisplay)  
+                        setNewRotation(cubeDisplay);      
+                        break;
+
+                    case 86: // v = vertices for cube
+                        setinitialRotation(cubeDisplay);
+                        scene.remove(cubeDisplay);
+                        cubeDisplay = cubeVertices;
+                        facesMode = false;
+                        scene.add(cubeDisplay)  
+                        setNewRotation(cubeDisplay);
+                        break;
+
+                    case 67: //c = removes cube from scene
+                        setinitialRotation(cubeDisplay);
+                        scene.remove(cubeDisplay); 
+                        setNewRotation(cubeDisplay);
+                        break;
+
+                    // TO DO: add code for starting/stopping rotations (requirement 3).
+                    case 82: // r = rotates cube on all axis 
+                        if(!cubeRotationX && !cubeRotationY && !cubeRotationZ){
+                            cubeRotationX = true;
+                            cubeRotationY = true;
+                            cubeRotationZ = true;
+                        }else{
+                            cubeRotationX = false;
+                            cubeRotationY = false;
+                            cubeRotationZ = false;
+                        }
+                    	break;
+
+                    case 88: //x = x rotation for cube
+                        if(!cubeRotationX){
+                            cubeRotationX = true;
+                        }else{
+                            cubeRotationX = false;
+                        }
+                        break;
+
+                    case 89: //y = y rotation for cube
+                        if(!cubeRotationY){
+                            cubeRotationY = true;
+                        }else{
+                            cubeRotationY = false;
+                        }
+                        break;
+
+                    case 90: //z = z rotation cube
+                        if(!cubeRotationZ){
+                            cubeRotationZ = true;
+                        }else{
+                            cubeRotationZ = false;
+                        }
+                        break;
+
+                    case 74: //j = faces mode for bunny
+                        setinitialRotation(bunnyDisplay);
+                        bunnyDisplay.remove(bunnyRenderMode);
+                        bunnyRenderMode = bunny;
+                        bunnyDisplay.add(bunnyRenderMode); 
+                        setNewRotation(bunnyDisplay);
+                        break;
+
+                    case 75: //k = edges mode for bunny
+                        setinitialRotation(bunnyDisplay);
+                        bunnyDisplay.remove(bunnyRenderMode);
+                        bunnyRenderMode = bunnyEdges;
+                        bunnyDisplay.add(bunnyRenderMode); 
+                        setNewRotation(bunnyDisplay);
+                        break;
+
+                    case 76: //l = vertex mode for bunny
+                        setinitialRotation(bunnyDisplay);
+                        bunnyDisplay.remove(bunnyRenderMode);
+                        bunnyRenderMode = bunnyVertices;
+                        bunnyDisplay.add(bunnyRenderMode); 
+                        setNewRotation(bunnyDisplay);
+                        break;
+
+                    case 66: //b = removes bunny from scene
+                        setinitialRotation(bunnyDisplay);
+                        bunnyDisplay.remove(bunnyRenderMode);
+                        setNewRotation(bunnyDisplay);
+                        break;
+
+                    case 73: //i = x rotation for bunny
+                        if(!bunnyRotationX){
+                            bunnyRotationX = true;
+                        }else{
+                            bunnyRotationX = false;
+                        }
+                        break;
+
+                    case 79: //o = y rotationk for bunny
+                        if(!bunnyRotationY){
+                            bunnyRotationY = true;
+                        }else{
+                            bunnyRotationY = false;
+                        }
+                        break;
+
+                    case 80: //p = z rotation for bunny
+                        if(!bunnyRotationZ){
+                            bunnyRotationZ = true;
+                        }else{
+                            bunnyRotationZ = false;
+                        }
+                        break;
+
+                    case 51: //reset roations for cube and bunny
+                        cubeDisplay.rotation.x = 0;
+                        cubeDisplay.rotation.y = 0;
+                        cubeDisplay.rotation.z = 0;
+                        cubeRotationX = false;
+                        cubeRotationY = false;
+                        cubeRotationZ = false;
+                        bunnyDisplay.rotation.x = 0;
+                        bunnyDisplay.rotation.y = 0;
+                        bunnyDisplay.rotation.z = 0;
+                        bunnyRotationX = false;
+                        bunnyRotationY = false;
+                        bunnyRotationZ = false;
+                        break;
+
+                    case 65: //a = translate camera left
+                    	camera.translateX(-cameraMovementDistance);
+                        childCamera.translateX(-cameraMovementDistance);
+                    	break;
+
+                    case 68: //d = translate camera right
+                    	camera.translateX(cameraMovementDistance);
+                        childCamera.translateX(cameraMovementDistance);
+                    	break;
+
+                    case 87://w = translate camera up
+                    	camera.translateY(cameraMovementDistance);
+                        childCamera.translateY(cameraMovementDistance);
+                    	break;
+
+                    case 83://s = translate camera down
+                    	camera.translateY(-cameraMovementDistance);
+                        childCamera.translateY(-cameraMovementDistance);
+                    	break;
+
+                    case 187://=/+ = translate camera in/zoom in 
+                    	camera.translateZ(-cameraMovementDistance);
+                        chidlCamera.translateZ(-cameraMovementDistance);
+                    	break;
+
+                    case 189://- = translate camera out/zoom out
+                    	camera.translateZ(cameraMovementDistance);
+                        childCamera.translateZ(cameraMovementDistance);
+                    	break;
+
+                    case 37://left arrow = orbit camera left
+                        calcSphericalCoord(); 
+                        phi +=5;
+                        calcCartesianCoord();
+                        camera.position.set(newX,newY,newZ);
+                        childCamera.lookAt(newX,newY,newZ);
+                        camera.lookAt(childCamera.position);
+                        break;
+
+                    case 39://right arrow = orbit camera right
+                        calcSphericalCoord();
+                        phi -= 5;
+                        calcCartesianCoord();
+                        camera.position.set(newX,newY,newZ);
+                        childCamera.lookAt(newX,newY,newZ);
+                        camera.lookAt(childCamera.position);
+                        break;   
+
+                    case 38://up arrow = orbit camera up
+                        calcSphericalCoord();
+                        if(theta - 5 > 0){
+                            theta-= 5;
+                        }else{
+                            theta = 1;
+                        }
+                        calcCartesianCoord();
+                        camera.position.set(newX,newY,newZ);
+                        childCamera.lookAt(newX,newY,newZ);
+                        camera.lookAt(childCamera.position);                  
+                        break;
+
+                    case 40://down arrow = orbit camera down
+                        calcSphericalCoord();
+                        if(theta + 5 < 180){
+                            theta +=5;
+                        }else{
+                            theta = 179
+                        }
+                        calcCartesianCoord();
+                        camera.position.set(newX,newY,newZ);
+                        childCamera.lookAt(newX,newY,newZ);
+                        camera.lookAt(childCamera.position); 
+                        break;
+
+                    case 84://t = reset camera look at point
+                        childCamera.position.set(0,0,0);
+                        childCamera.lookAt(camera.position);
+                        camera.lookAt(0,0,0);
+                        break;
+
+                    case 71://g = start game or reset game if started
+                        if(!gameOn){
+                            startGame();
+                        }else{
+                            resetGame();
+                            startGame();
+                        }
+                        break;
+
+                    case 72://h = removes game board from scene
+                        resetGame();
+                        break;
+
+                    case 78://n = cylces through game positions
+                        if(gameOn){
+                            if(gameTurns < 9){
+                                positionSelection();
+                            }
+                        }
+                        break;
+
+                    case 77://m = selects game position and places players geometry
+                        if(gameOn){
+                            if(gameTurns < 9){
+                                gameTurns++;
+                                if(p1Turn){
+                                    squareArray[currentSelection].geometry = p1Geometry;
+                                    squareArray[currentSelection].material = p1Material;
+                                    p1Turn = false;
+                                }else{
+                                    squareArray[currentSelection].geometry = p2Geometry;
+                                    squareArray[currentSelection].material = p2Material;
+                                    p1Turn = true;
+                                }
+                                positionSelection();
+                            }
+                        }
+                        break;
+                }
+            }
+		</script>
+	</body>
+</html>
